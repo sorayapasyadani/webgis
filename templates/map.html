@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Geo Fertile Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<script src="https://unpkg.com/maplibre-gl@2.1.9/dist/maplibre-gl.js"></script>
+<link href="https://unpkg.com/maplibre-gl@2.1.9/dist/maplibre-gl.css" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css?family=Roboto:300,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css?family=Poppins:300,400,500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css?family=Source+Serif+Pro:400,600&display=swap" rel="stylesheet">
+
+<style>
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        overflow: hidden;
+    }
+    #map {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 100%;
+    }
+    .legend {
+        background-color: white;
+        border-radius: 3px;
+        bottom: 10px; /* Tambahkan lebih banyak jarak ke bawah */
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+        font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+        padding: 10px;
+        position: absolute;
+        right: 10px;
+        z-index: 1;
+    }
+    .legend h4 {
+        margin: 0 0 10px;
+    }
+    .legend div {
+        display: flex;
+        align-items: center;
+        margin-bottom: 5px;
+    }
+    .legend div span {
+        border-radius: 50%;
+        display: inline-block;
+        height: 10px;
+        margin-right: 10px;
+        width: 10px;
+    }
+    .mapboxgl-ctrl-top-left {
+        margin-top: 70px; /* adjust for header height */
+    }
+</style>
+</head>
+
+<body>
+<div id="content">
+    <div id="map"></div>
+    <div class="legend">
+        <h4>Keterangan Warna</h4>
+<div><span style="background-color: #00FF00;"></span>Sangat Subur</div>
+<div><span style="background-color: #FFFF00;"></span>Cukup Subur</div>
+<div><span style="background-color: #FFA500;"></span>Kurang Subur</div>
+<div><span style="background-color: #FF0000;"></span>Tidak Subur</div>
+
+
+    </div>
+</div>
+<script>
+var map = new maplibregl.Map({
+    container: 'map', // container id
+    style: 'https://api.maptiler.com/maps/streets/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL', // style URL
+    center: [110.0, -7.5], // starting position [lng, lat]
+    zoom: 7 // starting zoom
+});
+
+// Add zoom and rotation controls to the map.
+map.addControl(new maplibregl.NavigationControl(), 'top-right');
+
+// Add geolocate control to the map.
+map.addControl(new maplibregl.GeolocateControl({
+    positionOptions: {
+        enableHighAccuracy: true
+    },
+    trackUserLocation: true
+}), 'top-right');
+
+map.on('load', function () {
+    console.log('Map loaded');
+
+    map.addSource('datasoil', {
+        'type': 'vector',
+        'tiles': [
+            'http://localhost:7800/public.datasoil/{z}/{x}/{y}.pbf'
+        ],
+        'minzoom': 0,
+        'maxzoom': 22
+    });
+
+    map.addLayer({
+        'id': 'datasoil-data',
+        'type': 'circle',
+        'source': 'datasoil',
+        'source-layer': 'public.datasoil',
+        'paint': {
+            'circle-radius': 5, // Ubah ukuran lingkaran sesuai kebutuhan
+            'circle-color': [
+                'match',
+                ['get', 'Keterangan'], // ganti dengan nama atribut kesuburan tanah
+                'sangat subur', '#00FF00',    // hijau untuk sangat subur
+                'cukup subur', '#FFFF00',     // kuning untuk cukup subur
+                'tidak subur', '#FF0000',     // merah untuk tidak subur
+                'kurang subur','#FFA500',     // warna orange untuk kurang subur
+                '#FF5722'                     // default warna jika tidak ada yang cocok
+            ]
+        }
+    });
+
+    console.log('Layer added');
+
+    var popup = new maplibregl.Popup({
+        closeButton: false,
+        closeOnClick: false
+    });
+
+    map.on('mouseenter', 'datasoil-data', function (e) {
+        map.getCanvas().style.cursor = 'pointer';
+
+        var coordinates = e.features[0].geometry.coordinates.slice();
+
+        var description = "";
+        for (const [key, value] of Object.entries(e.features[0].properties)) {
+            description += `<strong>${key}</strong>: ${value} <br>`;
+        }
+
+        while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+            coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+        }
+
+        popup.setLngLat(coordinates).setHTML(description).addTo(map);
+    });
+
+    map.on('mouseleave', 'datasoil-data', function () {
+        map.getCanvas().style.cursor = '';
+        popup.remove();
+    });
+});
+</script>
+</body>
+</html>
